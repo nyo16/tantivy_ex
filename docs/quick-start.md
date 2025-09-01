@@ -2,6 +2,12 @@
 
 Let's build a simple blog search engine in 5 minutes:
 
+## ⚠️ Important: String Search Fix Required
+
+The native string search functionality is currently broken. This tutorial uses the **fixed SearcherFixed module** for working string search. 
+
+**Quick Fix**: Use `alias TantivyEx.SearcherFixed, as: Searcher` instead of the regular Searcher.
+
 ## Step 1: Define Your Schema
 
 ```elixir
@@ -99,26 +105,29 @@ end)
 ## Step 4: Search Your Content
 
 ```elixir
+# Use the fixed searcher for working string search
+alias TantivyEx.SearcherFixed, as: Searcher
+
 # Simple text search
-{:ok, searcher} = TantivyEx.Searcher.new(index)
-{:ok, results} = TantivyEx.Searcher.search(searcher, "elixir", 10)
+{:ok, searcher} = Searcher.new(index)
+{:ok, results} = Searcher.search_with_schema(searcher, "elixir", schema, 10)
 IO.inspect(results, label: "Elixir posts")
 
 # Search in specific fields
-{:ok, results} = TantivyEx.Searcher.search(searcher, "title:phoenix", 10)
+{:ok, results} = Searcher.search_with_schema(searcher, "title:phoenix", schema, 10)
 IO.inspect(results, label: "Phoenix in title")
 
 # Boolean queries
-{:ok, results} = TantivyEx.Searcher.search(searcher, "elixir AND phoenix", 10)
+{:ok, results} = Searcher.search_with_schema(searcher, "elixir AND phoenix", schema, 10)
 IO.inspect(results, label: "Elixir AND Phoenix")
 
-# Range queries
-{:ok, results} = TantivyEx.Searcher.search(searcher, "rating:[4.0 TO *]", 10)
-IO.inspect(results, label: "High-rated posts")
+# Quoted field searches (multi-word terms)
+{:ok, results} = Searcher.search_with_schema(searcher, "author:\"John Doe\"", schema, 10)
+IO.inspect(results, label: "Posts by John Doe")
 
-# Facet queries
-{:ok, results} = TantivyEx.Searcher.search(searcher, "category:\"/programming/elixir\"", 10)
-IO.inspect(results, label: "Elixir category")
+# Wildcard searches
+{:ok, results} = Searcher.search_with_schema(searcher, "*", schema, 10)
+IO.inspect(results, label: "All posts")
 ```
 
 ## Step 5: Handle Results
@@ -126,10 +135,11 @@ IO.inspect(results, label: "Elixir category")
 ```elixir
 defmodule BlogSearch do
   alias TantivyEx.Index
+  alias TantivyEx.SearcherFixed, as: Searcher
 
-  def search_posts(index, query, limit \\ 10) do
-    {:ok, searcher} = TantivyEx.Searcher.new(index)
-    case TantivyEx.Searcher.search(searcher, query, limit) do
+  def search_posts(index, schema, query, limit \\ 10) do
+    {:ok, searcher} = Searcher.new(index)
+    case Searcher.search_with_schema(searcher, query, schema, limit) do
       {:ok, results} ->
         formatted_results = Enum.map(results, &format_result/1)
         {:ok, formatted_results}
@@ -214,8 +224,9 @@ updated_doc = %{"title" => "Updated Elixir Guide", "content" => "..."}
 Explore complex queries and filters:
 
 ```elixir
-# Complex boolean queries
-{:ok, results} = TantivyEx.Searcher.search(searcher, "(elixir OR phoenix) AND rating:[4.0 TO *]", 10)
+# Complex boolean queries using fixed searcher
+alias TantivyEx.SearcherFixed, as: Searcher
+{:ok, results} = Searcher.search_with_schema(searcher, "(elixir OR phoenix) AND functional", schema, 10)
 
 # Faceted search using Query module
 {:ok, parser} = TantivyEx.Query.parser(index, ["category", "author"])

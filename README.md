@@ -25,6 +25,15 @@ TantivyEx provides a complete, type-safe interface to Tantivy - Rust's fastest f
 - **Distributed Search**: Multi-node search coordination with load balancing, failover, and configurable result merging
 - **Search Features**: Full-text search, faceted search, range queries, and comprehensive analytics
 
+## ⚠️ Important Note: String Search Fix
+
+**String-based search is currently broken** in the native implementation. Use one of these working alternatives:
+
+1. **Query API** (recommended): `Query.term(schema, field, term)` 
+2. **Fixed String Search**: `SearcherFixed.search_with_schema(searcher, query, schema, limit)`
+
+See [WORKING_EXAMPLES.md](WORKING_EXAMPLES.md) for complete usage patterns.
+
 ## Quick Start
 
 ```elixir
@@ -65,9 +74,16 @@ doc = %{
 :ok = TantivyEx.IndexWriter.add_document(writer, doc)
 :ok = TantivyEx.IndexWriter.commit(writer)
 
-# Search
+# Search - Use Query API for reliable results
 {:ok, searcher} = TantivyEx.Searcher.new(index)
-{:ok, results} = TantivyEx.Searcher.search(searcher, "comprehensive guide", 10)
+
+# Option 1: Using Query objects (recommended - always works)
+{:ok, query} = TantivyEx.Query.term(schema, "title", "comprehensive")
+{:ok, results} = TantivyEx.Searcher.search(searcher, query, 10)
+
+# Option 2: Using the fixed string search (requires schema parameter)
+alias TantivyEx.SearcherFixed, as: FixedSearcher  
+{:ok, results} = FixedSearcher.search_with_schema(searcher, "comprehensive guide", schema, 10)
 
 # Advanced Aggregations (New in v0.2.0)
 {:ok, query} = TantivyEx.Query.all()
