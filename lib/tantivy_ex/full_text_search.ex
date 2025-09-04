@@ -119,8 +119,7 @@ defmodule TantivyEx.FullTextSearch do
   use GenServer
   require Logger
   
-  alias TantivyEx.{Schema, Index, IndexWriter}
-  alias TantivyEx.SearcherFixed, as: Searcher
+  alias TantivyEx.{Schema, Index, IndexWriter, Searcher, Query}
   
   defstruct [:schema, :index, :writer, :doc_count, :writer_memory]
   
@@ -595,9 +594,23 @@ defmodule TantivyEx.FullTextSearch do
   defp create_searcher_and_search(state, query_string, limit) do
     case Searcher.new(state.index) do
       {:ok, searcher} ->
-        Searcher.search_with_schema(searcher, query_string, state.schema, limit)
+        # Use native QueryParser with default text fields
+        default_fields = get_text_fields(state.schema)
+        Searcher.search_with_parser(searcher, state.schema, default_fields, query_string, limit)
       {:error, reason} ->
         {:error, "Failed to create searcher: #{inspect(reason)}"}
     end
+  end
+  
+  # Get all text fields from the schema for default search
+  defp get_text_fields(schema) do
+    field_names = Schema.get_field_names(schema)
+    
+    Enum.filter(field_names, fn field_name ->
+      case Schema.get_field_type(schema, field_name) do
+        {:ok, "text"} -> true
+        _ -> false
+      end
+    end)
   end
 end

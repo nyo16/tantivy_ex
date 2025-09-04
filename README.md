@@ -25,14 +25,18 @@ TantivyEx provides a complete, type-safe interface to Tantivy - Rust's fastest f
 - **Distributed Search**: Multi-node search coordination with load balancing, failover, and configurable result merging
 - **Search Features**: Full-text search, faceted search, range queries, and comprehensive analytics
 
-## ⚠️ Important Note: String Search Fix
+## ✅ Search Capabilities
 
-**String-based search is currently broken** in the native implementation. Use one of these working alternatives:
+TantivyEx now supports advanced string queries using the native QueryParser:
 
-1. **Query API** (recommended): `Query.term(schema, field, term)` 
-2. **Fixed String Search**: `SearcherFixed.search_with_schema(searcher, query, schema, limit)`
+- **Simple terms**: `"elixir"`
+- **Field-specific**: `"title:phoenix"`  
+- **Boolean queries**: `"elixir AND programming"`, `"elixir OR rust"`
+- **Complex boolean**: `"(elixir OR rust) AND programming"`
+- **Boost scoring**: `"title:sea^20 body:whale^70"`
+- **Numeric fields**: `"rating:5"`
 
-See [WORKING_EXAMPLES.md](WORKING_EXAMPLES.md) for complete usage patterns.
+Use `Searcher.search_with_parser/6` for string queries or `Query` objects for precise control.
 
 ## Quick Start
 
@@ -74,16 +78,23 @@ doc = %{
 :ok = TantivyEx.IndexWriter.add_document(writer, doc)
 :ok = TantivyEx.IndexWriter.commit(writer)
 
-# Search - Use Query API for reliable results
+# Search with native QueryParser (recommended for string queries)
 {:ok, searcher} = TantivyEx.Searcher.new(index)
 
-# Option 1: Using Query objects (recommended - always works)
+# Option 1: String queries with native QueryParser (recommended)
+default_fields = ["title", "body"]  # Fields to search when no field is specified
+{:ok, results} = TantivyEx.Searcher.search_with_parser(
+  searcher, schema, default_fields, "comprehensive guide", 10
+)
+
+# Advanced queries with boost scoring
+{:ok, results} = TantivyEx.Searcher.search_with_parser(
+  searcher, schema, default_fields, "title:tantivy^20 body:guide^5", 10
+)
+
+# Option 2: Using Query objects for precise control
 {:ok, query} = TantivyEx.Query.term(schema, "title", "comprehensive")
 {:ok, results} = TantivyEx.Searcher.search(searcher, query, 10)
-
-# Option 2: Using the fixed string search (requires schema parameter)
-alias TantivyEx.SearcherFixed, as: FixedSearcher  
-{:ok, results} = FixedSearcher.search_with_schema(searcher, "comprehensive guide", schema, 10)
 
 # Advanced Aggregations (New in v0.2.0)
 {:ok, query} = TantivyEx.Query.all()

@@ -44,7 +44,7 @@ defmodule TantivyEx.Searcher do
   @doc """
   Searches the index with the given query.
 
-  This function supports both string queries (which are parsed using AllQuery for now)
+  This function supports both string queries (parsed using native QueryParser)
   and Query objects created with TantivyEx.Query functions.
 
   ## Parameters
@@ -56,9 +56,6 @@ defmodule TantivyEx.Searcher do
 
   ## Examples
 
-      # Simple string search (legacy - uses AllQuery)
-      iex> {:ok, results} = TantivyEx.Searcher.search(searcher, "hello world", 10)
-
       # Using Query objects for precise control
       iex> {:ok, query} = TantivyEx.Query.term(schema, "title", "hello")
       iex> {:ok, results} = TantivyEx.Searcher.search(searcher, query, 10)
@@ -68,14 +65,16 @@ defmodule TantivyEx.Searcher do
       iex> {:ok, term2} = TantivyEx.Query.term(schema, "body", "world")
       iex> {:ok, boolean_query} = TantivyEx.Query.boolean([term1], [term2], [])
       iex> {:ok, results} = TantivyEx.Searcher.search(searcher, boolean_query, 10)
+
+      # For string queries, use search_with_parser/6 instead for better control
   """
   @spec search(t(), String.t() | Query.t(), pos_integer(), boolean()) ::
           {:ok, [search_result()]} | {:error, String.t()}
   def search(searcher, query, limit \\ 10, include_docs \\ true)
 
   def search(searcher, query, limit, include_docs) when is_binary(query) do
-    # Legacy string-based search - uses the old implementation for now
-    # In the future, this could parse the string with a default parser
+    # String queries are deprecated - recommend using search_with_parser/6
+    # This falls back to the old (broken) implementation for compatibility
     case Native.searcher_search(searcher, query, limit, include_docs) do
       {:error, reason} ->
         {:error, reason}
@@ -171,10 +170,18 @@ defmodule TantivyEx.Searcher do
   end
 
   @doc """
-  Performs a search with a query parser for Lucene-style queries.
+  **RECOMMENDED**: Performs search with native QueryParser for Lucene-style queries.
 
-  This is a convenience function that creates a parser, parses the query string,
-  and performs the search in one call.
+  This is the preferred way to perform string-based searches. It uses Tantivy's
+  native QueryParser which supports advanced query syntax including:
+  - Simple terms: `"elixir"`
+  - Field-specific: `"title:phoenix"`
+  - Boolean queries: `"elixir AND programming"`, `"elixir OR rust"`
+  - Complex boolean: `"(elixir OR rust) AND programming"`
+  - Boost scoring: `"title:sea^20 body:whale^70"`
+  - Numeric fields: `"rating:5"`
+  
+  Note: Quoted field queries like `"author:\"Jane Doe\""` may fail due to position indexing.
 
   ## Parameters
 
@@ -190,6 +197,11 @@ defmodule TantivyEx.Searcher do
       iex> {:ok, results} = TantivyEx.Searcher.search_with_parser(
       ...>   searcher, schema, ["title", "body"],
       ...>   "title:hello AND body:world", 10
+      ...> )
+      
+      iex> {:ok, results} = TantivyEx.Searcher.search_with_parser(
+      ...>   searcher, schema, ["title", "body"],
+      ...>   "title:sea^20 body:whale^70", 10
       ...> )
   """
   @spec search_with_parser(t(), Schema.t(), [String.t()], String.t(), pos_integer(), boolean()) ::
