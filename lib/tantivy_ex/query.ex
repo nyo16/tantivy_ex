@@ -548,4 +548,64 @@ defmodule TantivyEx.Query do
   rescue
     e -> {:error, "Failed to create facet term query: #{inspect(e)}"}
   end
+
+  @doc """
+  Creates a phrase prefix query that matches documents containing a phrase 
+  followed by a word starting with the given prefix.
+
+  This is the Elixir equivalent of the Rust example:
+  `query_parser.parse_query("\"in the su\"*")`
+
+  The query will match "in the sunlight" and "in the success" but not "in the Gulf Stream".
+
+  ## Parameters
+
+  - `schema`: The schema containing the field
+  - `field_name`: The name of the text field to search
+  - `phrase_terms`: List of exact terms that must appear in sequence
+  - `prefix_term`: The prefix that the following word must start with
+
+  ## Examples
+
+      # Matches "in the sunlight", "in the success", etc.
+      iex> {:ok, query} = TantivyEx.Query.phrase_with_prefix(schema, "body", ["in", "the"], "su")
+
+      # Matches "getting started with", "getting started without", etc.  
+      iex> {:ok, query} = TantivyEx.Query.phrase_with_prefix(schema, "title", ["getting", "started"], "w")
+  """
+  @spec phrase_with_prefix(Schema.t(), String.t(), [String.t()], String.t()) :: {:ok, t()} | {:error, String.t()}
+  def phrase_with_prefix(schema, field_name, phrase_terms, prefix_term) 
+      when is_binary(field_name) and is_list(phrase_terms) and is_binary(prefix_term) do
+    # For now, use the existing phrase_prefix with max_expansions 
+    # This is a workaround until we properly implement phrase prefix with term
+    case Native.query_phrase_prefix(schema, field_name, phrase_terms ++ [prefix_term], 50) do
+      {:error, reason} -> {:error, reason}
+      query_ref -> {:ok, query_ref}
+    end
+  rescue
+    e -> {:error, "Failed to create phrase prefix query: #{inspect(e)}"}
+  end
+
+  @doc """
+  Helper function to parse a phrase prefix query from a string like "\"in the su\"*"
+
+  This mimics the Rust QueryParser behavior for phrase prefix queries.
+
+  ## Examples
+
+      iex> {:ok, query} = TantivyEx.Query.parse_phrase_prefix(schema, "body", "\"in the su\"*")
+      iex> {:ok, query} = TantivyEx.Query.parse_phrase_prefix(schema, "title", "\"getting started w\"*")
+  """
+  @spec parse_phrase_prefix(Schema.t(), String.t(), String.t()) :: {:ok, t()} | {:error, String.t()}
+  def parse_phrase_prefix(schema, field_name, query_string) when is_binary(query_string) do
+    # Parse query string like "\"in the su\"*"
+    case Regex.run(~r/^"(.+)\s+([^"]+)"\*$/, query_string) do
+      [_, phrase_part, prefix_part] ->
+        phrase_terms = String.split(phrase_part, " ")
+        phrase_with_prefix(schema, field_name, phrase_terms, prefix_part)
+        
+      _ ->
+        {:error, "Invalid phrase prefix query format. Expected: \"phrase terms prefix\"*"}
+    end
+  end
 end

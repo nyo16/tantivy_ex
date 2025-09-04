@@ -740,3 +740,47 @@ pub fn facet_term_query(
 
     Ok(ResourceArc::new(QueryResource { query: boxed_query }))
 }
+
+#[rustler::nif]
+pub fn query_phrase_with_prefix(
+    schema_res: ResourceArc<SchemaResource>,
+    field_name: String,
+    phrase_terms: Vec<String>,
+    prefix_term: String,
+) -> NifResult<ResourceArc<QueryResource>> {
+    let field = match schema_res.schema.get_field(&field_name) {
+        Ok(field) => field,
+        Err(_) => {
+            return Err(rustler::Error::Term(Box::new(format!(
+                "Field '{}' not found",
+                field_name
+            ))))
+        }
+    };
+
+    // Convert phrase terms to Tantivy Terms
+    let mut terms: Vec<TantivyTerm> = Vec::new();
+    for term_str in phrase_terms {
+        terms.push(TantivyTerm::from_field_text(field, &term_str));
+    }
+    
+    // Create the prefix term
+    let prefix = TantivyTerm::from_field_text(field, &prefix_term);
+
+    // Create the phrase prefix query
+    let query = PhrasePrefixQuery::new(terms, prefix);
+    let boxed_query: Box<dyn tantivy::query::Query> = Box::new(query);
+
+    Ok(ResourceArc::new(QueryResource { query: boxed_query }))
+}
+
+#[rustler::nif]
+pub fn query_parser_set_conjunction_by_default(
+    parser_res: ResourceArc<QueryParserResource>
+) -> NifResult<ResourceArc<QueryParserResource>> {
+    // Note: QueryParser is not mutable in Tantivy, so we need to create a new one
+    // This is a limitation - we'd need to restructure to support parser configuration
+    Err(rustler::Error::Term(Box::new(
+        "QueryParser configuration not currently supported - create new parser with desired settings"
+    )))
+}

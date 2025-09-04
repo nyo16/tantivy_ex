@@ -186,7 +186,7 @@ defmodule TantivyEx.Searcher do
   ## Parameters
 
   - `searcher`: The Searcher
-  - `schema`: The schema for field resolution
+  - `index`: The Index (needed for QueryParser creation)
   - `default_fields`: List of fields to search by default
   - `query_str`: The Lucene-style query string
   - `limit`: Maximum number of results to return (default: 10)
@@ -195,26 +195,26 @@ defmodule TantivyEx.Searcher do
   ## Examples
 
       iex> {:ok, results} = TantivyEx.Searcher.search_with_parser(
-      ...>   searcher, schema, ["title", "body"],
+      ...>   searcher, index, ["title", "body"],
       ...>   "title:hello AND body:world", 10
       ...> )
       
       iex> {:ok, results} = TantivyEx.Searcher.search_with_parser(
-      ...>   searcher, schema, ["title", "body"],
+      ...>   searcher, index, ["title", "body"],
       ...>   "title:sea^20 body:whale^70", 10
       ...> )
   """
-  @spec search_with_parser(t(), Schema.t(), [String.t()], String.t(), pos_integer(), boolean()) ::
+  @spec search_with_parser(t(), Index.t(), [String.t()], String.t(), pos_integer(), boolean()) ::
           {:ok, [search_result()]} | {:error, String.t()}
   def search_with_parser(
         searcher,
-        schema,
+        index,
         default_fields,
         query_str,
         limit \\ 10,
         include_docs \\ true
       ) do
-    with {:ok, parser} <- Query.parser(schema, default_fields),
+    with {:ok, parser} <- Query.parser(index, default_fields),
          {:ok, query} <- Query.parse(parser, query_str),
          {:ok, results} <- search(searcher, query, limit, include_docs) do
       {:ok, results}
